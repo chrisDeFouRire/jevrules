@@ -1,0 +1,9 @@
+---
+description: The JEV API key must never appear in output, reports, cache or errors
+globs: "**/*.go"
+alwaysApply: false
+---
+
+The JEV API key (`TYPESAFE_API_KEY`, `JEV_API_KEY`, `~/.config/jevrules/credentials`) is a secret. It may only be read and placed in the HTTP `Authorization` header of a JEV request.
+
+Never print, log or format the key, or a struct that holds it, to stdout/stderr; never include it in error messages, in the text or JSON report, in cache keys or cache files, or in URLs and query strings.

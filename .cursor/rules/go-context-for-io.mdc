@@ -1,0 +1,9 @@
+---
+description: Network and subprocess calls take a context.Context from the caller
+globs: internal/**/*.go
+alwaysApply: false
+---
+
+Functions in `internal/` that make HTTP requests, run subprocesses (`git`) or wait on other goroutines must accept a `context.Context` as their first parameter and pass it on (`http.NewRequestWithContext`, `exec.CommandContext`, `select` on `ctx.Done()`), so that Ctrl-C and `--budget-tokens` stop the run cleanly.
+
+Do not create a fresh `context.Background()` or `context.TODO()` inside `internal/`; only `cmd/jevrules` and tests create root contexts.

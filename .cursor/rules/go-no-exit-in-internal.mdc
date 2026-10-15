@@ -1,0 +1,9 @@
+---
+description: Packages under internal/ return errors; only cmd/ decides exit codes
+globs: internal/**/*.go
+alwaysApply: false
+---
+
+Code in `internal/` must never terminate the process. Do not call `os.Exit`, `log.Fatal`, `log.Fatalf`, `log.Panic` or `panic` for expected failures (bad config, I/O errors, HTTP errors, invalid input). Return an `error` instead and let `cmd/jevrules` map it to an exit code (0 ok, 1 findings, 2 usage/config, 3 JEV unavailable).
+
+`panic` is acceptable only for programmer errors that cannot happen at runtime, such as an impossible `switch` default.

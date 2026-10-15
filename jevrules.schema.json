@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jevrules.local/jevrules.schema.json",
+  "title": "jevrules report",
+  "description": "Output of `jevrules --format json` (version 1). See docs/spec.md §6.1.",
+  "type": "object",
+  "required": ["version", "generatedAt", "repoRoot", "mode", "summary", "findings", "ruleMatrix", "skipped", "errors"],
+  "properties": {
+    "version": { "const": 1 },
+    "generatedAt": { "type": "string", "format": "date-time" },
+    "repoRoot": { "type": "string" },
+    "mode": { "type": "string", "description": "Target selection, e.g. changed, staged, since, all, paths, joined with +" },
+    "plan": { "type": "boolean" },
+    "validator": { "type": "string" },
+    "model": { "type": "string", "description": "Model requested; answers record the versioned model in the cache" },
+    "summary": {
+      "type": "object",
+      "required": ["filesConsidered", "filesChecked", "filesSkipped", "rulesLoaded", "rulesApplied", "validatorCalls", "cacheHits", "inputTokens", "findings"],
+      "properties": {
+        "filesConsidered": { "type": "integer", "minimum": 0 },
+        "filesChecked": { "type": "integer", "minimum": 0 },
+        "filesSkipped": { "type": "integer", "minimum": 0 },
+        "rulesLoaded": { "type": "integer", "minimum": 0 },
+        "rulesApplied": { "type": "integer", "minimum": 0, "description": "(file, rule) applications" },
+        "validatorCalls": { "type": "integer", "minimum": 0 },
+        "cacheHits": { "type": "integer", "minimum": 0 },
+        "inputTokens": { "type": "integer", "minimum": 0 },
+        "findings": { "type": "integer", "minimum": 0 },
+        "durationMs": { "type": "integer", "minimum": 0, "description": "Wall time of the run in milliseconds" },
+        "estimatedRequests": { "type": "integer", "minimum": 0 },
+        "estimatedInputTokens": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "rule", "ruleFile", "file", "confidence", "probability", "message"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^F[0-9]+$" },
+          "rule": { "type": "string" },
+          "ruleFile": { "type": "string" },
+          "file": { "type": "string" },
+          "confidence": { "enum": ["likely", "possible"] },
+          "probability": { "type": "number", "minimum": 0, "maximum": 1 },
+          "lines": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["start", "end"],
+              "properties": {
+                "start": { "type": "integer", "minimum": 1 },
+                "end": { "type": "integer", "minimum": 1 }
+              },
+              "additionalProperties": false
+            }
+          },
+          "evidence": { "type": "string", "description": "Up to 3 lines excerpted by jevrules (not produced by JEV)" },
+          "preexisting": { "type": "boolean", "description": "Located only outside the changed hunks" },
+          "message": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "ruleMatrix": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["file", "rules", "result"],
+        "properties": {
+          "file": { "type": "string" },
+          "rules": { "type": "array", "items": { "type": "string" } },
+          "result": { "enum": ["findings", "clean", "error", "unchecked", "planned"] },
+          "probabilities": { "type": "object", "additionalProperties": { "type": "number", "minimum": 0, "maximum": 1 } }
+        },
+        "additionalProperties": false
+      }
+    },
+    "skipped": {
+      "type": "object",
+      "required": ["files", "rules"],
+      "properties": {
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["file", "reason"],
+            "properties": { "file": { "type": "string" }, "reason": { "type": "string" } },
+            "additionalProperties": false
+          }
+        },
+        "rules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["rule", "ruleFile", "reason"],
+            "properties": { "rule": { "type": "string" }, "ruleFile": { "type": "string" }, "reason": { "type": "string" } },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["message"],
+        "properties": { "file": { "type": "string" }, "rule": { "type": "string" }, "message": { "type": "string" } },
+        "additionalProperties": false
+      }
+    },
+    "incomplete": { "type": "boolean" },
+    "unchecked": { "type": "array", "items": { "type": "string" } },
+    "fatal": { "type": "string" }
+  },
+  "additionalProperties": false
+}

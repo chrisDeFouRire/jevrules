@@ -1,0 +1,72 @@
+# Sample .jevrules.yml for a backend/ + frontend/ workspace (copy to <root>/.jevrules.yml).
+# Every key is optional; jevrules works without this file.
+
+validator: jev
+jev:
+  # Pinned on purpose: `jev-latest` moves between releases, which would shift
+  # the probabilities and throw away the cache.
+  model: jev-1.14.0
+  thresholds: { likely: 0.85, possible: 0.5, drilldown: 0.5 }
+
+defaults:
+  # code rules without globs apply to these extensions
+  extensions: [java, ts, html, scss, properties, sql, xml, gradle]
+  maxBytes: 200000
+
+drilldown: { window: 120, overlap: 20 }
+
+exclude:
+  - "**/build/**"
+  - "**/node_modules/**"
+  - "**/graphify-out/**"
+  - "**/src/test/resources/**"   # binary/large test fixtures
+
+# Keys: a rule id (all scopes) or <scope>/<id> (one scope).
+#   kind: code | workflow    globs: [...] (replaces the rule's globs)
+#   patterns: [regex]        prefilter — JEV is asked only if one matches the file
+rules:
+  # --- alwaysApply rules without globs that really constrain code -----------
+  # (default would be `workflow`, i.e. never checked)
+  error-messages-user-facing:
+    globs: ["**/*.java"]
+    patterns: ['throw\s+new\s+\w+Exception']
+  config-keys-namespaced:
+    globs: ["**/*.java"]
+    patterns: ['ConfigService']
+  date-format-display:
+    globs: ["**/*.java", "**/*.ts", "**/*.html"]
+  no-hardcoded-config:
+    globs: ["**/*.java"]
+    patterns: ['ConfigService']
+  dto-no-nullable-annotations:
+    globs: ["**/*.java"]
+    patterns: ['@(Nullable|NonNull)\b']
+  sql-index-naming:
+    globs: ["**/*.sql"]
+    patterns: ['(?i)\b(create|add)\s+(unique\s+)?(index|key)\b']
+  sql-no-string-concatenation:
+    globs: ["**/*.java"]
+    patterns: ['(?i)"[^"]*\b(select|where)\b[^"]*"\s*\+']
+  sql-qualified-table-names:
+    globs: ["**/*.java", "**/*.sql"]
+    patterns: ['(?i)\b(from|join|update|into)\s+\w']
+  jdbc-use-query-helpers:
+    globs: ["**/*.java"]
+    patterns: ['jdbcTemplate\.query']
+  openapi-no-internal-names:
+    globs: ["**/*.java"]
+    patterns: ['@(Schema|Operation|Parameter)\b']
+  scss-use-theme-variables:
+    globs: ["**/*.scss"]
+
+  # --- prefilters for syntactic rules (cheaper, fewer false positives) -----
+  java-shared-objectmapper:         { patterns: ['new\s+ObjectMapper'] }
+  java-cache-regex-patterns:        { patterns: ['Pattern\.compile'] }
+  java-instanceof-pattern-matching: { patterns: ['\binstanceof\b'] }
+  no-native-html-tooltip:           { patterns: ['\btitle\b'] }
+  button-label-no-tooltip:          { patterns: ['(?i)tooltip|\btitle\b'] }
+  pagination-page-sizes:            { patterns: ['(?i)rows|page'] }
+
+  # Everything else that is alwaysApply without globs (code-map,
+  # read-docs-first, use-gradle-wrapper, build-before-done, commit-messages, …)
+  # stays `workflow`: listed under `skipped`, never sent to JEV.

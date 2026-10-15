@@ -1,0 +1,9 @@
+---
+description: Wrap errors with %w so callers can use errors.Is
+globs: "**/*.go"
+alwaysApply: false
+---
+
+When an error is returned with added context, wrap it with `fmt.Errorf("...: %w", err)`, not `%v` or `%s`, so that callers can still test it with `errors.Is` / `errors.As`.
+
+This matters most for the validator sentinels (`ErrAuth`, `ErrUnavailable`, `ErrTooLarge`): `cmd/jevrules` maps them to exit code 3, so they must always reach it wrapped with `%w`. Never compare errors with `==` or by matching their message text; use `errors.Is`.

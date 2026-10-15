@@ -1,0 +1,13 @@
+---
+description: Keep README and docs in sync with CLI behaviour
+alwaysApply: true
+---
+
+When you add, rename or remove a flag, command, exit code, config key or JSON report field, update in the same change:
+
+- the usage table and examples in `README.md`,
+- `jevrules.schema.json` for report fields,
+- `examples/jevrules.yml` for config keys,
+- the "Deviations from the spec" list in `docs/development.md` when behaviour departs from `docs/spec.md`.
+
+Before finishing, run `go test ./...` and `jevrules --changed` from the repo root.

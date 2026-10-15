@@ -1,0 +1,7 @@
+# jevrules checks its own code against .cursor/rules.
+rules:
+  # Prefilters: only ask JEV when the file could plausibly violate the rule.
+  go-no-exit-in-internal:  { patterns: ['os\.Exit|log\.(Fatal|Panic)|\bpanic\('] }
+  go-wrap-sentinel-errors: { patterns: ['fmt\.Errorf|errors\.New|err\s*[!=]=\s*Err'] }
+  go-never-leak-api-key:   { patterns: ['(?i)api_?key|credentials|Authorization'] }
+  go-context-for-io:       { patterns: ['net/http|os/exec|context\.(Background|TODO)'] }

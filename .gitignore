@@ -1,0 +1,5 @@
+.env
+/jevrules
+/bin/
+.jevrules-cache/
+/dist/

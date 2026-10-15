@@ -1,0 +1,9 @@
+---
+description: Tests run offline, without an API key
+globs: "**/*_test.go"
+alwaysApply: false
+---
+
+`go test ./...` must pass with no network access and no JEV API key. Tests must not call the real JEV endpoint or any other external host: use the mock validator (`--validator mock`, `JEVRULES-VIOLATES:<rule-id>` markers) or an `httptest.Server` pointed to through the client's endpoint field or `JEVRULES_JEV_ENDPOINT`.
+
+Tests must not read the developer's real credentials (`TYPESAFE_API_KEY`, `JEV_API_KEY`, `~/.config/jevrules/credentials`) and must write only under `t.TempDir()`.

@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="420" viewBox="0 0 880 420">
+  <defs>
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="115%">
+      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#000" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+  <rect x="20" y="16" width="840" height="384" rx="10" fill="#1e1f29" filter="url(#shadow)"/>
+  <path d="M20 26 a10 10 0 0 1 10 -10 h820 a10 10 0 0 1 10 10 v20 h-840 z" fill="#2b2d3a"/>
+  <circle cx="40" cy="31" r="6" fill="#ff5f57"/>
+  <circle cx="60" cy="31" r="6" fill="#febc2e"/>
+  <circle cx="80" cy="31" r="6" fill="#28c840"/>
+  <text x="440" y="35" text-anchor="middle" font-family="Menlo, Monaco, 'DejaVu Sans Mono', monospace" font-size="12" fill="#8b8fa3">jevrules — zsh</text>
+  <g font-family="Menlo, Monaco, 'DejaVu Sans Mono', monospace" font-size="14" xml:space="preserve">
+    <text x="40" y="78"><tspan fill="#50fa7b">$</tspan><tspan fill="#f8f8f2"> jevrules --all --no-cache</tspan></text>
+    <text x="40" y="104" fill="#f8f8f2"><tspan font-weight="bold">jevrules:</tspan> 17 files checked, 65 rule applications, <tspan fill="#ffb86c">2 possible violations</tspan></text>
+    <text x="40" y="146"><tspan fill="#ff79c6" font-weight="bold">RULE</tspan><tspan fill="#f8f8f2" font-weight="bold"> go-wrap-sentinel-errors</tspan><tspan fill="#6272a4">  (.cursor/rules/go-wrap-sentinel-errors.mdc)</tspan></text>
+    <text x="40" y="168" fill="#f1fa8c">  "Wrap errors with %w so callers can use errors.Is"</text>
+    <text x="40" y="190"><tspan fill="#f8f8f2">  - internal/engine/engine.go  </tspan><tspan fill="#ffb86c">[possible, p=0.70, file-level]</tspan></text>
+    <text x="40" y="212"><tspan fill="#f8f8f2">  - internal/validator/jev.go  </tspan><tspan fill="#ffb86c">[possible, p=0.59, file-level]</tspan></text>
+    <text x="40" y="234"><tspan fill="#8be9fd">  next:</tspan><tspan fill="#f8f8f2"> jevrules explain go-wrap-sentinel-errors</tspan></text>
+    <text x="40" y="276"><tspan fill="#50fa7b" font-weight="bold">CLEAN</tspan><tspan fill="#f8f8f2"> (checked, no findings): 15 files</tspan></text>
+    <text x="40" y="298"><tspan fill="#6272a4" font-weight="bold">SKIPPED:</tspan><tspan fill="#6272a4"> 1 workflow rules</tspan></text>
+    <text x="40" y="320" fill="#6272a4">validator: jev-1.14.0, 10 calls, 0 cache hits, 45872 input tokens (~$0.0019), 1.5s</text>
+    <text x="40" y="362"><tspan fill="#50fa7b">$</tspan><tspan fill="#f8f8f2"> </tspan></text>
+    <rect x="58" y="349" width="9" height="17" fill="#f8f8f2" opacity="0.85"/>
+  </g>
+</svg>
