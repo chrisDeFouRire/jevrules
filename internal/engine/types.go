@@ -20,12 +20,18 @@ type Finding struct {
 	Evidence    string      `json:"evidence,omitempty"`
 	Preexisting bool        `json:"preexisting,omitempty"`
 	Message     string      `json:"message"`
+	// DismissedReason is set on findings in Report.Dismissed: the file and
+	// rule are unchanged since someone ran `jevrules dismiss`.
+	DismissedReason string `json:"dismissedReason,omitempty"`
+	// EarlierDismissal is the reason of a dismissal that no longer applies
+	// because the file or the rule changed since.
+	EarlierDismissal string `json:"earlierDismissal,omitempty"`
 }
 
 type MatrixRow struct {
 	File   string   `json:"file"`
 	Rules  []string `json:"rules"`
-	Result string   `json:"result"` // findings | clean | error | unchecked | planned
+	Result string   `json:"result"` // findings | dismissed | clean | error | unchecked | planned
 	// Probabilities from the whole-file pass, per rule (JSON only).
 	Probabilities map[string]float64 `json:"probabilities,omitempty"`
 }
@@ -57,6 +63,7 @@ type Summary struct {
 	CacheHits       int   `json:"cacheHits"`
 	InputTokens     int   `json:"inputTokens"`
 	Findings        int   `json:"findings"`
+	Dismissed       int   `json:"dismissed"`
 	DurationMs      int64 `json:"durationMs"` // wall time of the run
 	// --plan --estimate only
 	EstimatedRequests    int `json:"estimatedRequests,omitempty"`
@@ -73,6 +80,7 @@ type Report struct {
 	Model       string       `json:"model,omitempty"`
 	Summary     Summary      `json:"summary"`
 	Findings    []Finding    `json:"findings"`
+	Dismissed   []Finding    `json:"dismissed"`
 	RuleMatrix  []MatrixRow  `json:"ruleMatrix"`
 	Skipped     Skipped      `json:"skipped"`
 	Errors      []ErrorEntry `json:"errors"`

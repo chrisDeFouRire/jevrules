@@ -30,7 +30,9 @@ For each finding:
 1. Read the rule.
 2. Select the best method to examine the code for this rule.
 3. If the code does not obey the rule, correct the code.
-4. If the code obeys the rule, write what you examined and the result.
+4. If the code obeys the rule, record what you examined and the result:
+   jevrules dismiss <rule> <file> --reason "<text>"
+   Later runs do not report it again until the file or the rule changes.
 Use --precision only if no other method is possible. It uses many validator calls.
 `
 
@@ -84,6 +86,9 @@ func Text(w io.Writer, r *engine.Report, explainRef func(ruleFile string) string
 				ev, _, _ := strings.Cut(f.Evidence, "\n")
 				fmt.Fprintf(w, "      %s\n", ev)
 			}
+			if f.EarlierDismissal != "" {
+				fmt.Fprintf(w, "      dismissed before, but the file or rule changed since: %s\n", f.EarlierDismissal)
+			}
 		}
 		fmt.Fprintf(w, "  next: jevrules explain %s\n", explainRef(g.file))
 	}
@@ -95,6 +100,12 @@ func Text(w io.Writer, r *engine.Report, explainRef func(ruleFile string) string
 		}
 	}
 	fmt.Fprintf(w, "\nCLEAN (checked, no findings): %d files\n", clean)
+	if len(r.Dismissed) > 0 {
+		fmt.Fprintf(w, "DISMISSED (file and rule unchanged since): %d\n", len(r.Dismissed))
+		for _, f := range r.Dismissed {
+			fmt.Fprintf(w, "  - %s  %s: %s\n", f.Rule, f.File, f.DismissedReason)
+		}
+	}
 	if line := skippedLine(r); line != "" {
 		fmt.Fprintf(w, "SKIPPED: %s\n", line)
 	}

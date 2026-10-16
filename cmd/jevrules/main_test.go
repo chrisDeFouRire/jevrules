@@ -240,3 +240,49 @@ func validateSchema(t *testing.T, raw []byte) {
 		t.Errorf("schema: %v", err)
 	}
 }
+
+func TestDismiss(t *testing.T) {
+	root := workspace(t)
+	file := filepath.Join(root, "front/src/a.component.html")
+	target := "front/src/a.component.html"
+	var out, errb bytes.Buffer
+
+	if c := run([]string{"dismiss", "--root", root, "no-tooltip", target}, &out, &errb); c != exitUsage {
+		t.Errorf("dismiss without --reason: exit %d", c)
+	}
+	if c := run([]string{"dismiss", "--root", root, "java", target, "--reason", "x"}, &out, &errb); c != exitUsage {
+		t.Errorf("dismiss with a rule that does not apply: exit %d", c)
+	}
+	if c := run([]string{"dismiss", "--root", root, "no-tooltip", target, "--reason", "title is an SVG attribute"}, &out, &errb); c != exitOK {
+		t.Fatalf("dismiss: exit %d: %s", c, errb.String())
+	}
+
+	rep, raw, code := runJSON(t, root, "--fail-on", "possible", "--precision", "high", file)
+	if code != exitOK || len(rep.Findings) != 0 || len(rep.Dismissed) != 1 || rep.Summary.Dismissed != 1 {
+		t.Fatalf("after dismiss: exit %d, findings %+v, dismissed %+v", code, rep.Findings, rep.Dismissed)
+	}
+	if d := rep.Dismissed[0]; d.ID != "D1" || d.DismissedReason != "title is an SVG attribute" || len(d.Lines) != 0 {
+		t.Errorf("dismissed = %+v (want no drill-down)", d)
+	}
+	if rep.RuleMatrix[0].Result != "dismissed" {
+		t.Errorf("matrix result = %q", rep.RuleMatrix[0].Result)
+	}
+	validateSchema(t, raw)
+
+	// The file changes: the dismissal no longer applies, but its reason is shown.
+	replaceLine(t, file, 150, "<div>edited</div>")
+	rep, raw, _ = runJSON(t, root, file)
+	if len(rep.Findings) != 1 || len(rep.Dismissed) != 0 || rep.Findings[0].EarlierDismissal != "title is an SVG attribute" {
+		t.Fatalf("after edit: findings %+v, dismissed %+v", rep.Findings, rep.Dismissed)
+	}
+	validateSchema(t, raw)
+
+	// Dismissing again replaces the entry instead of adding one.
+	if c := run([]string{"dismiss", "--root", root, "no-tooltip", target, "--reason", "still fine"}, &out, &errb); c != exitOK {
+		t.Fatalf("dismiss again: exit %d: %s", c, errb.String())
+	}
+	b, _ := os.ReadFile(filepath.Join(root, ".jevrules-dismissed.json"))
+	if n := strings.Count(string(b), `"ruleFile"`); n != 1 {
+		t.Errorf("entries = %d, want 1:\n%s", n, b)
+	}
+}

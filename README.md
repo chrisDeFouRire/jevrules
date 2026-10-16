@@ -84,6 +84,7 @@ jevrules --all                        # every tracked file that matches a rule
 jevrules path/to/File.java src/       # explicit files / directories
 jevrules --plan --estimate --all      # requests and tokens a run would cost
 jevrules explain <rule-id>            # a rule's text (use scope/rule-id when ids collide)
+jevrules dismiss <rule-id> <file> --reason "…"   # a finding examined and rejected
 jevrules --precision high             # also pinpoint the offending lines (more calls)
 jevrules --format json --out report.json   # schema: jevrules.schema.json
 ```
@@ -111,6 +112,8 @@ Before finishing a task, run `jevrules --changed` from the workspace root and se
 ```
 
 The report itself tells the agent what to do with findings: they are candidates to confirm or dismiss, and the agent picks how to check each rule (searching, reading the code, or rerunning jevrules with `--precision`).
+
+A rejected finding can be recorded with `jevrules dismiss <rule> <file> --reason "…"`. The entry goes in `.jevrules-dismissed.json` at the root; commit it. Later runs list the finding under `DISMISSED` instead of reporting it, until the file or the rule changes. Then the finding comes back with the earlier reason attached.
 
 Git `pre-commit` hook (in each repo):
 

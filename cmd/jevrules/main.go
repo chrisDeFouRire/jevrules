@@ -13,11 +13,13 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	flag "github.com/spf13/pflag"
 
 	"github.com/chrisDeFouRire/jevRules/internal/cache"
 	"github.com/chrisDeFouRire/jevRules/internal/config"
+	"github.com/chrisDeFouRire/jevRules/internal/dismiss"
 	"github.com/chrisDeFouRire/jevRules/internal/engine"
 	"github.com/chrisDeFouRire/jevRules/internal/files"
 	"github.com/chrisDeFouRire/jevRules/internal/report"
@@ -46,6 +48,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 			return cmdRules(args[1:], stdout, stderr)
 		case "explain":
 			return cmdExplain(args[1:], stdout, stderr)
+		case "dismiss":
+			return cmdDismiss(args[1:], stdout, stderr)
 		case "version", "--version":
 			fmt.Fprintln(stdout, "jevrules", version)
 			return exitOK
@@ -65,6 +69,8 @@ Usage:
   jevrules --plan [--estimate]       show which rules apply, without calling JEV
   jevrules rules [--for <file>]      list discovered rules
   jevrules explain <rule-id>         print a rule's text (use scope/id if ids collide)
+  jevrules dismiss <rule-id> <file> --reason <text>
+                                     record that a finding was examined and rejected
   jevrules version                   print the version
 
 Targets (union):  --changed (default) --staged --since <ref> --all <paths…>
@@ -218,10 +224,17 @@ func cmdCheck(args []string, stdout, stderr io.Writer) int {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 
+	dismissed, err := dismiss.Load(root)
+	if err != nil {
+		fmt.Fprintf(stderr, "jevrules: %v\n", err)
+		return exitUsage
+	}
+
 	sel := files.NewSelector(ctx, root, idx.ScopeRoots())
 	e := &engine.Engine{
 		Root: root, Cfg: cfg, Index: idx, Sel: sel, V: v,
-		Cache: cache.Open(root, noCache || plan),
+		Cache:     cache.Open(root, noCache || plan),
+		Dismissed: dismissed,
 		Opt: engine.Options{
 			Files: o, Plan: plan, Estimate: estimate, Jobs: jobs,
 			Drilldown: precision != "none", Precision: precision, WholeFile: wholeFile,
@@ -448,6 +461,87 @@ func cmdExplain(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stdout, r.Body)
 	}
 	return exitOK
+}
+
+func cmdDismiss(args []string, stdout, stderr io.Writer) int {
+	fs := flag.NewFlagSet("dismiss", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	var c common
+	c.register(fs)
+	var reason string
+	fs.StringVar(&reason, "reason", "", "what you examined and the result (required)")
+	if err := fs.Parse(args); err != nil {
+		return exitUsage
+	}
+	reason = strings.TrimSpace(reason)
+	if fs.NArg() != 2 || reason == "" {
+		fmt.Fprintf(stderr, "usage: jevrules dismiss <rule-id | scope/rule-id> <file> --reason <text>\n")
+		return exitUsage
+	}
+	root, _, idx, err := c.load()
+	if err != nil {
+		fmt.Fprintf(stderr, "jevrules: %v\n", err)
+		return exitUsage
+	}
+	rs := idx.Find(fs.Arg(0))
+	switch {
+	case len(rs) == 0:
+		fmt.Fprintf(stderr, "jevrules: unknown rule %q (see `jevrules rules`)\n", fs.Arg(0))
+		return exitUsage
+	case len(rs) > 1:
+		fmt.Fprintf(stderr, "jevrules: rule id %q is ambiguous; use scope/rule-id\n", fs.Arg(0))
+		return exitUsage
+	}
+	r := rs[0]
+	file, err := rootRelative(root, fs.Arg(1))
+	if err != nil {
+		fmt.Fprintf(stderr, "jevrules: %v\n", err)
+		return exitUsage
+	}
+	content, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(file)))
+	if err != nil {
+		fmt.Fprintf(stderr, "jevrules: %v\n", err)
+		return exitUsage
+	}
+	applies := false
+	for _, x := range idx.For(file, nil) {
+		applies = applies || x == r
+	}
+	if !applies {
+		fmt.Fprintf(stderr, "jevrules: rule %s does not apply to %s\n", r.ID, file)
+		return exitUsage
+	}
+	st, err := dismiss.Load(root)
+	if err != nil {
+		fmt.Fprintf(stderr, "jevrules: %v\n", err)
+		return exitUsage
+	}
+	st.Add(r.Path, file, content, r.Body, reason, time.Now())
+	if err := st.Save(); err != nil {
+		fmt.Fprintf(stderr, "jevrules: %v\n", err)
+		return exitUsage
+	}
+	fmt.Fprintf(stdout, "dismissed %s for %s (until the file or the rule changes); recorded in %s\n", r.ID, file, dismiss.FileName)
+	return exitOK
+}
+
+// rootRelative accepts a path relative to the root (as the report prints it)
+// or to the current directory, and returns it root-relative with slashes.
+func rootRelative(root, p string) (string, error) {
+	if !filepath.IsAbs(p) {
+		if _, err := os.Stat(filepath.Join(root, p)); err == nil {
+			return filepath.ToSlash(filepath.Clean(p)), nil
+		}
+	}
+	abs, err := filepath.Abs(p)
+	if err != nil {
+		return "", err
+	}
+	rel, err := filepath.Rel(root, abs)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("%s is outside %s", p, root)
+	}
+	return filepath.ToSlash(rel), nil
 }
 
 func isTTY(f *os.File) bool {

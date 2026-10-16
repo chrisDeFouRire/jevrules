@@ -15,6 +15,7 @@ import (
 
 	"github.com/chrisDeFouRire/jevRules/internal/cache"
 	"github.com/chrisDeFouRire/jevRules/internal/config"
+	"github.com/chrisDeFouRire/jevRules/internal/dismiss"
 	"github.com/chrisDeFouRire/jevRules/internal/files"
 	"github.com/chrisDeFouRire/jevRules/internal/rules"
 	"github.com/chrisDeFouRire/jevRules/internal/validator"
@@ -52,22 +53,25 @@ type Engine struct {
 	Sel   *files.Selector
 	V     validator.Validator
 	Cache *cache.Cache
-	Opt   Options
+	// Dismissed, if set, holds findings already examined and rejected.
+	Dismissed *dismiss.Store
+	Opt       Options
 
 	calls, hits, tokens atomic.Int64
 }
 
 type outcome struct {
-	file     string
-	skip     string // reason; "" when processed
-	silent   bool   // dropped without being counted (--all, no rules)
-	row      *MatrixRow
-	findings []Finding
-	errs     []ErrorEntry
-	estReq   int
-	estTok   int
-	budget   bool  // stopped by the budget guard
-	fatal    error // aborts the run (authentication)
+	file      string
+	skip      string // reason; "" when processed
+	silent    bool   // dropped without being counted (--all, no rules)
+	row       *MatrixRow
+	findings  []Finding
+	dismissed []Finding
+	errs      []ErrorEntry
+	estReq    int
+	estTok    int
+	budget    bool  // stopped by the budget guard
+	fatal     error // aborts the run (authentication)
 }
 
 // Run executes the whole pipeline and returns the report. A non-nil error
@@ -81,6 +85,7 @@ func (e *Engine) Run(ctx context.Context) (*Report, error) {
 		Mode:        e.Opt.Files.Mode(),
 		Plan:        e.Opt.Plan,
 		Findings:    []Finding{},
+		Dismissed:   []Finding{},
 		RuleMatrix:  []MatrixRow{},
 		Skipped:     Skipped{Files: []SkippedFile{}, Rules: []SkippedRule{}},
 		Errors:      []ErrorEntry{},
@@ -167,32 +172,29 @@ func (e *Engine) Run(ctx context.Context) (*Report, error) {
 		rep.Summary.EstimatedRequests += o.estReq
 		rep.Summary.EstimatedInputTokens += o.estTok
 		switch o.row.Result {
-		case "findings", "clean":
+		case "findings", "dismissed", "clean":
 			rep.Summary.FilesChecked++
 		case "unchecked":
 			rep.Incomplete = true
 			rep.Unchecked = append(rep.Unchecked, o.file)
 		}
 		rep.Findings = append(rep.Findings, o.findings...)
+		rep.Dismissed = append(rep.Dismissed, o.dismissed...)
 		rep.Errors = append(rep.Errors, o.errs...)
 	}
 	if ctx.Err() != nil && len(outs) < len(cands) {
 		rep.Incomplete = true
 	}
-	sort.SliceStable(rep.Findings, func(i, j int) bool {
-		a, b := rep.Findings[i], rep.Findings[j]
-		if a.Rule != b.Rule {
-			return a.Rule < b.Rule
-		}
-		if a.File != b.File {
-			return a.File < b.File
-		}
-		return firstLine(a) < firstLine(b)
-	})
+	sortFindings(rep.Findings)
+	sortFindings(rep.Dismissed)
 	for i := range rep.Findings {
 		rep.Findings[i].ID = fmt.Sprintf("F%d", i+1)
 	}
+	for i := range rep.Dismissed {
+		rep.Dismissed[i].ID = fmt.Sprintf("D%d", i+1)
+	}
 	rep.Summary.Findings = len(rep.Findings)
+	rep.Summary.Dismissed = len(rep.Dismissed)
 	rep.Summary.ValidatorCalls = int(e.calls.Load())
 	rep.Summary.CacheHits = int(e.hits.Load())
 	rep.Summary.InputTokens = int(e.tokens.Load())
@@ -205,6 +207,19 @@ func (e *Engine) Run(ctx context.Context) (*Report, error) {
 		return rep, cause
 	}
 	return rep, nil
+}
+
+func sortFindings(fs []Finding) {
+	sort.SliceStable(fs, func(i, j int) bool {
+		a, b := fs[i], fs[j]
+		if a.Rule != b.Rule {
+			return a.Rule < b.Rule
+		}
+		if a.File != b.File {
+			return a.File < b.File
+		}
+		return firstLine(a) < firstLine(b)
+	})
 }
 
 func firstLine(f Finding) int {
@@ -316,6 +331,29 @@ func (e *Engine) process(ctx context.Context, c files.Candidate) outcome {
 		return o
 	}
 
+	// Dismissed pairs whose file and rule are unchanged are reported apart and
+	// not drilled into; a dismissal that no longer applies is passed on.
+	earlier := map[string]string{}
+	active := flagged[:0:0]
+	for _, r := range flagged {
+		d, current, ok := e.Dismissed.Lookup(r.Path, c.File, content, r.Body)
+		switch {
+		case ok && current:
+			f := e.finding(r, c.File, probs[r.ID])
+			f.DismissedReason = d.Reason
+			o.dismissed = append(o.dismissed, f)
+			continue
+		case ok:
+			earlier[r.ID] = d.Reason
+		}
+		active = append(active, r)
+	}
+	flagged = active
+	if len(flagged) == 0 {
+		o.row.Result = "dismissed"
+		return o
+	}
+
 	locs := map[string]location{}
 	if e.Opt.Drilldown {
 		if e.Opt.Files.DiffScoped() && !e.Opt.WholeFile {
@@ -344,21 +382,8 @@ func (e *Engine) process(ctx context.Context, c files.Candidate) outcome {
 	}
 
 	for _, r := range flagged {
-		p := probs[r.ID]
-		f := Finding{
-			Rule:        r.ID,
-			RuleFile:    r.Path,
-			File:        c.File,
-			Confidence:  "possible",
-			Probability: round3(p),
-			Message:     r.Description,
-		}
-		if p >= th.Likely {
-			f.Confidence = "likely"
-		}
-		if f.Message == "" {
-			f.Message = firstHeading(r.Body)
-		}
+		f := e.finding(r, c.File, probs[r.ID])
+		f.EarlierDismissal = earlier[r.ID]
 		if l, ok := locs[r.ID]; ok {
 			f.Lines = l.ranges
 			f.Preexisting = l.preexisting
@@ -368,6 +393,24 @@ func (e *Engine) process(ctx context.Context, c files.Candidate) outcome {
 	}
 	o.row.Result = "findings"
 	return o
+}
+
+func (e *Engine) finding(r *rules.Rule, file string, p float64) Finding {
+	f := Finding{
+		Rule:        r.ID,
+		RuleFile:    r.Path,
+		File:        file,
+		Confidence:  "possible",
+		Probability: round3(p),
+		Message:     r.Description,
+	}
+	if p >= e.Cfg.Jev.Thresholds.Likely {
+		f.Confidence = "likely"
+	}
+	if f.Message == "" {
+		f.Message = firstHeading(r.Body)
+	}
+	return f
 }
 
 func (e *Engine) failed(o outcome, err error) outcome {

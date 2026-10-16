@@ -26,6 +26,7 @@
         "cacheHits": { "type": "integer", "minimum": 0 },
         "inputTokens": { "type": "integer", "minimum": 0 },
         "findings": { "type": "integer", "minimum": 0 },
+        "dismissed": { "type": "integer", "minimum": 0, "description": "Findings matching a dismissal in .jevrules-dismissed.json" },
         "durationMs": { "type": "integer", "minimum": 0, "description": "Wall time of the run in milliseconds" },
         "estimatedRequests": { "type": "integer", "minimum": 0 },
         "estimatedInputTokens": { "type": "integer", "minimum": 0 }
@@ -38,7 +39,7 @@
         "type": "object",
         "required": ["id", "rule", "ruleFile", "file", "confidence", "probability", "message"],
         "properties": {
-          "id": { "type": "string", "pattern": "^F[0-9]+$" },
+          "id": { "type": "string", "pattern": "^[FD][0-9]+$", "description": "F<n> for findings, D<n> for dismissed findings" },
           "rule": { "type": "string" },
           "ruleFile": { "type": "string" },
           "file": { "type": "string" },
@@ -58,10 +59,16 @@
           },
           "evidence": { "type": "string", "description": "Up to 3 lines excerpted by jevrules (not produced by JEV)" },
           "preexisting": { "type": "boolean", "description": "Located only outside the changed hunks" },
-          "message": { "type": "string" }
+          "message": { "type": "string" },
+          "dismissedReason": { "type": "string", "description": "Only in `dismissed`: the reason recorded by `jevrules dismiss`" },
+          "earlierDismissal": { "type": "string", "description": "Reason of a dismissal that no longer applies: the file or the rule changed since" }
         },
         "additionalProperties": false
       }
+    },
+    "dismissed": {
+      "description": "Findings that match a dismissal: file and rule unchanged since `jevrules dismiss`. Same shape as `findings`.",
+      "$ref": "#/properties/findings"
     },
     "ruleMatrix": {
       "type": "array",
@@ -71,7 +78,7 @@
         "properties": {
           "file": { "type": "string" },
           "rules": { "type": "array", "items": { "type": "string" } },
-          "result": { "enum": ["findings", "clean", "error", "unchecked", "planned"] },
+          "result": { "enum": ["findings", "dismissed", "clean", "error", "unchecked", "planned"] },
           "probabilities": { "type": "object", "additionalProperties": { "type": "number", "minimum": 0, "maximum": 1 } }
         },
         "additionalProperties": false

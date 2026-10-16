@@ -138,6 +138,7 @@ Binary files, files > `--max-bytes` (default 200 000), generated paths (`build/`
 | `jevrules --plan` | No validator call. Prints for each file the rules that apply. Cheap; lets an agent read the relevant rules itself. |
 | `jevrules rules [--for <file>]` | Lists discovered rules, their globs, kind, and (with `--for`) whether they apply. |
 | `jevrules explain <rule-id>` | Prints the rule body, so an agent can load it on demand. |
+| `jevrules dismiss <rule-id> <file> --reason <text>` | Records that a finding was examined and rejected (§6.3). |
 
 ### 5.5 Exit codes
 
@@ -204,6 +205,14 @@ SKIPPED: 3 files (excluded), 9 workflow rules
 ```
 
 Rules for the text output: no ANSI colour unless TTY; paths are repo-root-relative; one finding per line plus at most one evidence line; always include the rule file path and the `next:` hint. When there are findings, a short paragraph after the summary line tells the agent what they are for: candidates to settle (fix or dismiss with evidence). It names the goal, not a method. The agent chooses how to check each rule (searching, reading the code, or a `--precision` rerun), because no single verification workflow suits every rule.
+
+### 6.3 Dismissals
+
+`jevrules dismiss <rule> <file> --reason <text>` writes an entry to `<root>/.jevrules-dismissed.json`, which is meant to be committed so CI and the team share it. An entry holds the rule file path, the file path, `sha256` of the file content and of the rule body, the reason and the date. There is one entry per (rule, file); dismissing again replaces it.
+
+During a run, a flagged (file, rule) pair whose two hashes match an entry is not reported in `findings`. It goes in `dismissed` (ids `D<n>`) with `dismissedReason`, is not drilled into, and does not count for `--fail-on`. When either hash differs, the finding is reported as usual with `earlierDismissal` set to the old reason. A dismissal therefore expires by itself when the file or the rule changes, and no baseline needs cleaning.
+
+The validator is still asked about dismissed pairs (the cache makes this free while the file is unchanged), so a rule that stops flagging the file simply drops the entry from the report.
 
 ## 7. Architecture
 
@@ -330,7 +339,7 @@ All keys optional; the tool must work with no config file.
 | Risk | Mitigation |
 |---|---|
 | Workflow-style rules produce noise | `kind: workflow` default heuristics + sidecar overrides (§4.3). |
-| False positives erode trust | Confidence levels, evidence line, `preexisting` flag, advisory exit code by default. |
+| False positives erode trust | Confidence levels, evidence line, `preexisting` flag, content-hash dismissals (§6.3), advisory exit code by default. |
 | Some rules are not written in English | Pass rule text verbatim; no translation. |
 | Rule drift between Cursor and this tool | Tool reads the same files; no copies. |
 | JEV returns probabilities only (no lines/explanations) | Drill-down pass (§8.3); evidence is the tool's own excerpt, not JEV's reasoning. |
