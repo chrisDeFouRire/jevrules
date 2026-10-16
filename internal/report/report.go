@@ -20,6 +20,20 @@ func JSON(w io.Writer, r *engine.Report) error {
 	return enc.Encode(r)
 }
 
+// howToAct tells the reading agent what the findings are for. It states the
+// goal and leaves the method to the agent: a fixed workflow (always drill
+// down, always grep) is wrong for some rules.
+const howToAct = `
+The findings are possible errors only. For each finding, the validator examined
+one file against one rule. It did not examine other files.
+For each finding:
+1. Read the rule.
+2. Select the best method to examine the code for this rule.
+3. If the code does not obey the rule, correct the code.
+4. If the code obeys the rule, write what you examined and the result.
+Use --precision only if no other method is possible. It uses many validator calls.
+`
+
 // Text renders findings grouped by rule. explainRef maps a rule file path to
 // the argument for `jevrules explain` (scope-qualified when ids collide).
 func Text(w io.Writer, r *engine.Report, explainRef func(ruleFile string) string) {
@@ -32,6 +46,9 @@ func Text(w io.Writer, r *engine.Report, explainRef func(ruleFile string) string
 		s.FilesChecked, s.RulesApplied, s.Findings)
 	if r.Fatal != "" {
 		fmt.Fprintf(w, "ABORTED: %s\n", r.Fatal)
+	}
+	if len(r.Findings) > 0 {
+		fmt.Fprint(w, howToAct)
 	}
 
 	type group struct {

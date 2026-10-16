@@ -203,7 +203,7 @@ CLEAN (checked, no findings): 8 files
 SKIPPED: 3 files (excluded), 9 workflow rules
 ```
 
-Rules for the text output: no ANSI colour unless TTY; paths are repo-root-relative; one finding per line plus at most one evidence line; always include the rule file path and the `next:` hint.
+Rules for the text output: no ANSI colour unless TTY; paths are repo-root-relative; one finding per line plus at most one evidence line; always include the rule file path and the `next:` hint. When there are findings, a short paragraph after the summary line tells the agent what they are for: candidates to settle (fix or dismiss with evidence). It names the goal, not a method. The agent chooses how to check each rule (searching, reading the code, or a `--precision` rerun), because no single verification workflow suits every rule.
 
 ## 7. Architecture
 

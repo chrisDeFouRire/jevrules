@@ -18,6 +18,9 @@ Treat the findings as leads, not verdicts. JEV gives a probability, and it is so
 $ jevrules
 jevrules: 2 files checked, 18 rule applications, 3 possible violations
 
+The findings are possible errors only. For each finding, the validator examined
+…
+
 RULE java-no-fully-qualified-names  (backend/.cursor/rules/java-no-fully-qualified-names.mdc)
   "Avoid fully-qualified class names in Java code; add an import instead"
   - backend/module-billing/src/main/java/com/example/module/billing/BillingSearchParams.java  [likely, p=0.91, file-level]
@@ -104,10 +107,10 @@ Add this to the workspace `AGENTS.md` (Codex) and point to it from `CLAUDE.md`:
 ```markdown
 ## Conventions check
 
-Before finishing a task, run `jevrules --changed` from the workspace root.
-For each finding, run `jevrules explain <rule>` and fix the code or explain why the finding does not apply.
-Findings are file-level: read the file to locate them (or rerun with `--precision high`).
+Before finishing a task, run `jevrules --changed` from the workspace root and settle every finding it reports.
 ```
+
+The report itself tells the agent what to do with findings: they are candidates to confirm or dismiss, and the agent picks how to check each rule (searching, reading the code, or rerunning jevrules with `--precision`).
 
 Git `pre-commit` hook (in each repo):
 
